@@ -39,7 +39,7 @@ def next_day_label(col):
 # add next day features
 for col in maincols:
     new_name = next_day_label(col)
-    maindf[new_name] = maindf[col].shift(-1) # Attempt 1
+    maindf[new_name] = maindf[col].shift(-1)
 
 # training and evaluating models for each stock
 def train_eval(customdf, traincols=maincols, test_size=0.8, plot=True):
