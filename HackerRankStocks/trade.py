@@ -4,6 +4,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
 
 
 # stream simulator
@@ -48,6 +52,7 @@ class myTrader:
             mystocks : list, 
             init_cash : int, 
             max_hist_len : int, 
+            regular_update = False,
             analysis = False
     ):
 
@@ -55,10 +60,11 @@ class myTrader:
         self.mystocks = mystocks
         self.max_hist_len = max_hist_len
         self.analysis = analysis
+        self.regular_update = regular_update
             
         # key variables stored
         self.cur_cash = init_cash
-        self.cur_stocks_held_value = self.cur_cash
+        self.cur_stocks_held_value = 0
         self.cur_day_count = 0
         self.yesterday_prices = {}
         self.today_prices = {}
@@ -76,6 +82,7 @@ class myTrader:
         self.stored_prices_tomorrow = { stock : [] for stock in self.mystocks }
         if self.analysis:
             self.mydays_daily = []
+            self.mycash_daily = []
             self.mysells_daily = { stock : [] for stock in self.mystocks }
             self.myprofits_daily = { stock : [] for stock in self.mystocks }
             self.mypredictions_daily = { stock : [] for stock in self.mystocks }
@@ -142,6 +149,7 @@ class myTrader:
         self.today_prices = today_prices
         self.today_prices_diff = {}
 
+
         to_delete = []
         # set type of prices, check validity, and compute price difference
         for stock in self.mystocks:
@@ -175,6 +183,7 @@ class myTrader:
 
         if self.analysis:
             self.mydays_daily.append(self.cur_day_count)
+            self.mycash_daily.append(self.cur_cash)
 
         # reset some variables (for consistency)
         self.tomorrow_prices_preds.clear()
@@ -196,11 +205,15 @@ class myTrader:
                 profit_total = self.today_sells[stock]*self.today_prices_diff[stock]
             else:
                 profit_total = 0
+
             self.myprofits_total[stock] += profit_total
   
             if self.analysis:
                 self.mysells_daily[stock].append(self.today_sells[stock])
                 self.myprofits_daily[stock].append(profit_total)
+
+        # set value of stocks (always 0 after selling)
+        self.cur_stocks_held_value = 0
 
     # simple buy (for now): only buy today if predicted to make a profit tomorrow and allow buying of stocks fractionally
     # amount to buy will depend on amount of profit made so far on a particular stock
@@ -245,11 +258,11 @@ class myTrader:
             if self.today_prices[stock] <= 0:
                 quantity_stock = 10000000 # just by alot if free or negative
             else:
-                quantity_stock = round(cash_allocated_stock/self.today_prices[stock], 5)
+                quantity_stock = int(cash_allocated_stock/self.today_prices[stock]) # take the floor
             self.today_buys[stock] = quantity_stock
             self.cur_stocks_held[stock] = quantity_stock
 
-            total_cash_spent += quantity_stock*self.today_prices[stock] # recompute incase of rounding error in quantity
+            total_cash_spent += quantity_stock*self.today_prices[stock] # recompute due to floor func
     
             if self.analysis:
                 self.mybuys_daily[stock].append(quantity_stock)
@@ -264,7 +277,7 @@ class myTrader:
 
 
     # the main function essentially
-    def executeDay(self, today_prices : dict) -> dict:
+    def executeDay_old(self, today_prices : dict) -> dict:
 
         # standard day, only train model at 10th day
         self.initDay(today_prices)
@@ -280,7 +293,62 @@ class myTrader:
             trades[stock] = (self.today_sells[stock], self.today_buys[stock])
         
         return trades
+
+    # structure output
+    def getTrades(self):
+        trades={}
+        for stock in self.mystocks:
+            if bool(self.today_buys):
+                trades[stock] = f'{stock} BUY {self.today_buys[stock]}'
+            else:
+                trades[stock] = f'{stock} SELL {self.today_sells[stock]}'
+        return trades
+
+    # processing a day
+    def executeDay(self, today_prices : dict) -> dict:
+
+        # initialise dat
+        self.initDay(today_prices)
+        
+        if self.cur_day_count % 2 ==0:
+            self.makeSells() # sell all
+
+        # only train model after collected enough data
+        if self.regular_update:
+            cond = self.cur_day_count % self.max_hist_len*2 == 0
+        else:
+            cond = self.cur_day_count == self.max_hist_len
+        if cond:
+            self.trainModels()
+
+        if self.cur_day_count % 2 == 1:
+            self.getPreds()
+            self.makeBuys()
+
+        # returned appropriately structured output        
+        return self.getTrades()
     
+    # analyse trading period so far
+    def analyseProfits(self):
+        df = pd.DataFrame.from_dict(self.myprofits_daily).astype('float64')
+        # df['daily_profits'] = df.sum(axis=1)
+        df['cumulative_profits'] = df.sum(axis=1).cumsum(axis=0)
+        
+        df.insert(0, "day", [ i + 1 for i in range(int(self.cur_day_count/2))])
+
+        # compare all stocks and total profit
+        dfmelt = pd.melt(df, ['day'])
+
+        # check days of loss
+        # dfmelt = pd.melt(df[['total_profits', 'day']].loc[df['total_profits'] < 0], ['day'])
+
+        plt.figure()
+        plt.title("Daily Profits")
+        sns.lineplot(data=dfmelt, x='day', y='value', hue='variable')
+        plt.yscale('log')
+        plt.show()
+
+
 # simulating a daily trading market given some data 
 if __name__ == '__main__':
 
@@ -297,15 +365,27 @@ if __name__ == '__main__':
 
     # initialise stream simulator and trader
     stream = streamSim(data_dict)
-    trader = myTrader(stream.all_stocks, 100, 10)
+    trader = myTrader(stream.all_stocks, 100, 10, analysis = True)
 
+    start = time.time()
     while not stream.end_of_stream:
         today_prices = stream.getNextDayPrices()
 
-        start = time.time()
         trades = trader.executeDay(today_prices)
-        time_taken = time.time() - start
 
-        # can improve speed by using numpy arrays instead of looping over the keys of dicts for everything
-        print(trader.cur_day_count, trader.cur_cash, trader.cur_stocks_held_value, round(time_taken, 2))
-        print(trader.myprofits_total)
+        # # can improve speed by using numpy arrays instead of looping over the keys of dicts for everything
+        if trader.cur_day_count % 25 == 0:    
+            print()
+            print(trader.cur_day_count, trader.cur_cash, trader.cur_stocks_held_value)
+            print(trader.myprofits_total)
+
+
+    time_taken = time.time() - start
+    print()
+    print("num of days trading:", trader.cur_day_count)
+    print("total cash:", trader.cur_cash)
+    print("profits:", trader.myprofits_total)
+    print("total time (s):", round(time_taken, 3))
+    print("average time per trade (s):", round(time_taken/trader.cur_day_count, 3))
+
+    trader.analyseProfits()
