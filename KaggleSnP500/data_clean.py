@@ -14,6 +14,10 @@ if __name__ == '__main__':
     for i in range(delta.days + 1):
         dates.append(str(start_date + datetime.timedelta(days=i)))
 
+    # subsample to ~100 stocks
+    total_size = 0 # filled later
+    samp_size = 100
+
     # dicts for open, high, low, close, and volume 
     stocks_info = {}
 
@@ -24,9 +28,10 @@ if __name__ == '__main__':
 
     for root, _, files in os.walk('./archive'):
         # randomly sample ~100 stocks to work with (fix local randomness with seed)
+        total_size = len(files)
         random.Random(125).shuffle(files)
 
-        for file in files[:10]:
+        for file in files[:min(samp_size, total_size)]:
             df = pd.read_csv(os.path.join(root, file))
             stock = file[:3]
 
@@ -69,7 +74,20 @@ if __name__ == '__main__':
     good_cols = non_na_sum.loc[non_na_sum >= med].index
     main_df = main_df[good_cols].dropna()
 
-    print(main_df.head())
-
+    # check that all remaining stocks have open, high, low, close, and volume (after clearing NaNs)
+    final_cols = set(main_df.columns)
+    for file in files:
+        stock = file[:3]    
+        sum_check = 0
+        for key in main_cols:
+            if not mylabel(stock, key) in final_cols:
+                sum_check += 1
+        if not (sum_check == len(main_cols) or sum_check == 0):
+            raise Exception("Stock {stock} does not have all the relevant fields.")
+        
+    # export to csv
+    main_df.to_csv("cleaned_100.csv")
+    print(f"Table saved! It contains all fields for {int((len(final_cols) - 1)/5)} of {total_size} stocks")
+    
 
 
