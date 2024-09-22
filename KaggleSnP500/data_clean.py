@@ -16,13 +16,14 @@ if __name__ == '__main__':
 
     # subsample to ~100 stocks
     total_size = 0 # filled later
-    samp_size = 100
+    samp_size = 101
+    samp_stocks = []
 
     # dicts for open, high, low, close, and volume 
     stocks_info = {}
 
     # define main columns and helper label function
-    main_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+    main_info = ['Open', 'High', 'Low', 'Close', 'Volume']
     mylabel = lambda a,b : f'{a}_{b}'
 
 
@@ -33,7 +34,10 @@ if __name__ == '__main__':
 
         for file in files[:min(samp_size, total_size)]:
             df = pd.read_csv(os.path.join(root, file))
-            stock = file[:3]
+
+            # save stocks sampled
+            stock = file[:-4]
+            samp_stocks.append(stock)
 
             # retain rows with relevant dates
             df = df.loc[df['Date'] >= str(start_date)]
@@ -41,25 +45,25 @@ if __name__ == '__main__':
             stock_dates = df['Date'].values
 
             # get values of relevant columns
-            stock_info = df[main_cols].values
+            stock_info = df[main_info].values
 
             # prep relevant arrays in dictionaries
-            for key in main_cols:
+            for key in main_info:
                 stocks_info[mylabel(stock,key)] = []
 
             # make dates line up (without any gaps) and fill spaces with None
             i = 0
             for j in range(len(stock_dates)):
                 if dates[i] == stock_dates[j]:
-                    for k, key in enumerate(main_cols):
+                    for k, key in enumerate(main_info):
                         stocks_info[mylabel(stock,key)].append(stock_info[j][k])
                     i += 1
                 else:
                     while dates[i] != stock_dates[j]:
-                        for key in main_cols:
+                        for key in main_info:
                             stocks_info[mylabel(stock,key)].append(None)
                         i += 1
-                    for k, key in enumerate(main_cols):
+                    for k, key in enumerate(main_info):
                         stocks_info[mylabel(stock,key)].append(stock_info[j][k])
                     i += 1
 
@@ -74,20 +78,26 @@ if __name__ == '__main__':
     good_cols = non_na_sum.loc[non_na_sum >= med].index
     main_df = main_df[good_cols].dropna()
 
-    # check that all remaining stocks have open, high, low, close, and volume (after clearing NaNs)
+    # check that all remaining sampled stocks have open, high, low, close, and volume (after clearing NaNs)
     final_cols = set(main_df.columns)
-    for file in files:
-        stock = file[:3]    
+    final_stocks = []
+    for stock in samp_stocks:
         sum_check = 0
-        for key in main_cols:
-            if not mylabel(stock, key) in final_cols:
+        for key in main_info:
+            if mylabel(stock, key) in final_cols:
                 sum_check += 1
-        if not (sum_check == len(main_cols) or sum_check == 0):
+        if sum_check == len(main_info):
+            final_stocks.append(stock)
+        elif sum_check != 0:
             raise Exception("Stock {stock} does not have all the relevant fields.")
         
-    # export to csv
-    main_df.to_csv("cleaned_100.csv")
-    print(f"Table saved! It contains all fields for {int((len(final_cols) - 1)/5)} of {total_size} stocks")
+    # export dataframe and final stocks to csv
+    main_df.to_csv(f"cleaned_{len(final_stocks)}.csv", index=False)
+
+    np.savetxt(f"cleaned_{len(final_stocks)}_tickers.csv", np.array(final_stocks), delimiter=',', fmt='%s')
+
+    print(f"Table saved! It contains the fields {main_info} for {len(final_stocks)} (out of {total_size}) stocks (names saved separately) for {main_df.shape[0]} days between {start_date} and {end_date}.")
+
     
 
 
