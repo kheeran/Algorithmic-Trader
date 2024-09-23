@@ -26,7 +26,7 @@ if __name__ == '__main__':
     main_info = ['Open', 'High', 'Low', 'Close', 'Volume']
     mylabel = lambda a,b : f'{a}_{b}'
 
-
+    # Data from https://www.kaggle.com/datasets/rprkh15/sp500-stock-prices
     for root, _, files in os.walk('./archive'):
         # randomly sample ~100 stocks to work with (fix local randomness with seed)
         total_size = len(files)
