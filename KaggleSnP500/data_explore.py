@@ -10,13 +10,13 @@ main_df = pd.read_csv(f"cleaned_{samp_size}.csv")
 main_info = ['Open', 'High', 'Low', 'Close', 'Volume']
 tickers = np.genfromtxt(f"cleaned_{samp_size}_tickers.csv", delimiter=',', dtype=str)
 
-# # time series plot of data
-# melt_df = pd.melt(main_df, 'Date')
-# plt.figure()
-# sns.lineplot(data=melt_df, x='Date', y='value', hue='variable', legend=False)
-# plt.yscale('log')
-# plt.ylabel('price/volume')
-# plt.show()
+# time series plot of data
+melt_df = pd.melt(main_df, 'Date')
+plt.figure()
+sns.lineplot(data=melt_df, x='Date', y='value', hue='variable', legend=False)
+plt.yscale('log')
+plt.ylabel('price/volume')
+plt.show()
 
 # specify observed and target labels
 obs_cols = list(main_df.columns)

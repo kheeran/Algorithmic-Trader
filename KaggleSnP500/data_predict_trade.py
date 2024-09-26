@@ -50,8 +50,72 @@ class SimDataStream:
 
 # Algorithmic Trader (TODO)
 class Trader:
-    def __init__(self):
+    def __init__(self, init_cash : int, ticker_names : list, col_names : list, max_hist_len : int) -> None:
+
+        # settings of trader
+        self.cur_day = 0
+        self.cur_cash = init_cash # current available cash
+        self.mytickers = ticker_names # stocks to trade
+        self.col_names = col_names # labels for each entry of the daily value array
+        self.max_hist_len = max_hist_len
+
+        # prices/volumes of stocks, and current shares held and the price they were bought for, and profits for each stock
+        self.cur_vals = None
+        self.hist_vals = []
+        self.cur_shares_held = np.zeros(len(self.mytickers))
+        self.cur_shares_prev_price = np.zeros(len(self.mytickers))
+        self.total_shares_profit = np.zeros(len(self.mytickers))
+
+        # prediction models
+        self.cur_models_1 = [None for _ in range(len(self.col_names))]
+        self.cur_models_2 = [None for _ in range(len(self.col_names))]
+
+        # current buy/sell orders for stocks
+        self.cur_buy_ords = { ticker : None for ticker in self.mytickers }
+        self.cur_sell_ords = { ticker : None for ticker in self.mytickers }
+
+    # initialise the day of trading and update order books
+    def initDay(self, today_vals : list) -> None:
+        self.cur_day += 1
+        self.cur_vals = today_vals
+        self.updateOrders()
+        self.updateHist()
+
+        # sanity check
+        # validate that ticker names and columns are exactly what is expected (so we can index instead of lookup)
+        fields = ['Open', 'High', 'Low', 'Close', 'Volume']
+        # TODO
+
+    # update current order books
+    # use today (end of day) values to evaluate
+    # if buy/sell order is between the high and low, then order goes through (at 5% volume max for simplicity)
+    # automatically cancel all orders that do not go through (simplicity)
+    def updateOrders(self) -> None:
         pass
+    
+    # update the stored history of values
+    def updateHist(self) -> None:
+        pass
+
+    # create models for each value being predicted and for +1 and +2 days (many models)
+    # structure models as dictionary for easy access
+    def trainModels(self) -> None:
+        pass
+
+    # evaluate each model and return a tuple of +1 day and +2 day predictions
+    def predNextVals(self) -> tuple:
+        pass
+
+    # create new orders using predicted values for the subsequent days
+    def createOrders(self, tomorrow_vals : list, day_after_vals : list) -> None:
+        pass
+    
+    # execute a day of trading
+    def execDay(self) -> None:
+        self.initDay()
+        pass
+
+
 
 
 if __name__ == "__main__":
