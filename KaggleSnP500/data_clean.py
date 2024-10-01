@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     # subsample to ~100 stocks
     total_size = 0 # filled later
-    samp_size = 101
+    samp_size = 10
     samp_stocks = []
 
     # dicts for open, high, low, close, and volume 
