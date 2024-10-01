@@ -1,5 +1,8 @@
 import numpy as np
 import linecache # fastest when RAM is large enough to store the entire file (https://stackoverflow.com/questions/19189961/python-fastest-access-to-nth-line-in-huge-file). Otherwise use islice from itertools, which does not store file in RAM.
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+
 
 # Simulate stream of daily prices (i.e. import cleaned data)
 # It contains the fields ['Open', 'High', 'Low', 'Close', 'Volume'] for 10 (out of 503) stocks (names saved separately) for 757 days between 2019-01-01 and 2021-12-31.
@@ -68,8 +71,7 @@ class Trader:
         self.total_shares_profit = np.zeros(len(self.mytickers))
 
         # prediction models
-        self.cur_models_1 = [None for _ in range(len(self.col_names))]
-        self.cur_models_2 = [None for _ in range(len(self.col_names))]
+        self.cur_models = [{} for _ in range(len(self.col_names))]
 
         # current buy/sell orders for stocks
         self.cur_buy_ords = {}
@@ -149,10 +151,45 @@ class Trader:
             self.hist_vals.pop(0)
         self.hist_vals.append(self.cur_vals)
 
+    # helper column name function for model training + prediction
+    def 
+
     # create models for each value being predicted and for +1 and +2 days (many models)
     # structure models as dictionary for easy access
-    def trainModels(self) -> None:
-        pass
+    def trainModels(self,d) -> None:
+        
+        # Create dataframe from historical data 
+        df = pd.DataFrame(self.hist_vals, columns = self.col_names)
+
+        # setup observed columns for supervised learning
+        obs_cols = [*self.col_names]
+
+        # Models for +d day predictor
+        for col_name in self.col_names:
+
+            # get difference data for upto d diffs (using history)
+            for i in range(d):
+                new_col = f'{col_name}_diff-{i+1}'
+                df[new_col] = df[col_name].diff(i+1)
+                obs_cols.append(new_col)
+
+
+        # get observed variables
+        Xs = df[obs_cols].values
+
+        # construct prediction model for each dimension/value in vector (i.e., column)
+        for col_name in self.col_names:
+            
+            # get +d day target data for training
+            ys = df[col_name].shift(-d)
+
+            # train model
+            model = RandomForestRegressor()
+            model.fit(Xs, ys.ravel()) # ravel needed since single feature to be learned
+
+            self.cur_models[f'{col_name}_+{d}'] = model
+
+
 
     # evaluate each model and return a tuple of +1 day and +2 day predictions
     def predNextVals(self) -> tuple:
